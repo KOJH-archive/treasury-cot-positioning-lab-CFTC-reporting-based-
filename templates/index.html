@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COT Treasury Futures Analytics</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</head>
+<body>
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+
+    <main class="app-container">
+        <header>
+            <div class="header-left">
+                <div class="eyebrow">CFTC TFF · FUTURES ONLY</div>
+                <h1>Treasury Positioning Lab</h1>
+                <p>주체별 포지션과 실제 국채선물 가격을 같은 시계열에서 추적합니다.</p>
+            </div>
+
+            <div class="controls" aria-label="대시보드 필터">
+                <label>
+                    <span>시장</span>
+                    <select id="market-select"></select>
+                </label>
+                <label>
+                    <span>표시 기간</span>
+                    <select id="period-select">
+                        <option value="3M">3개월</option>
+                        <option value="6M">6개월</option>
+                        <option value="1Y" selected>1년</option>
+                        <option value="3Y">3년</option>
+                        <option value="5Y">5년</option>
+                        <option value="ALL">전체</option>
+                    </select>
+                </label>
+            </div>
+        </header>
+
+        <section class="data-status" id="data-status" aria-live="polite">
+            <span class="status-dot"></span>
+            <span id="status-text">데이터를 불러오는 중입니다.</span>
+        </section>
+
+        <nav class="entity-selector" id="entity-tabs" aria-label="수급 주체"></nav>
+
+        <section class="dashboard-grid">
+            <article class="card stat-card" id="stat-price">
+                <span class="stat-label">최근 선물 가격</span>
+                <span class="stat-value">--</span>
+                <span class="stat-change">--</span>
+            </article>
+            <article class="card stat-card" id="stat-net-position">
+                <span class="stat-label">현재 순포지션</span>
+                <span class="stat-value">--</span>
+                <span class="stat-change">--</span>
+            </article>
+            <article class="card stat-card" id="stat-oi-pct">
+                <span class="stat-label">OI 대비 순포지션</span>
+                <span class="stat-value">--</span>
+                <span class="stat-change">--</span>
+            </article>
+            <article class="card stat-card" id="stat-flow">
+                <span class="stat-label">최근 4주 포지션 변화</span>
+                <span class="stat-value">--</span>
+                <span class="stat-change">--</span>
+            </article>
+            <article class="card stat-card" id="stat-percentile">
+                <span class="stat-label">52주 Percentile</span>
+                <span class="stat-value">--</span>
+                <span class="stat-change">--</span>
+            </article>
+            <article class="card stat-card" id="stat-zscore">
+                <span class="stat-label">52주 Robust Z</span>
+                <span class="stat-value">--</span>
+                <span class="stat-change">--</span>
+            </article>
+
+            <section class="chart-section">
+                <article class="card main-chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <span class="chart-title" id="main-chart-title">가격과 포지션</span>
+                            <span class="chart-subtitle">좌축: 연속선물 가격 · 우축: 순포지션/OI</span>
+                        </div>
+                    </div>
+                    <div id="price-position-chart"></div>
+                </article>
+
+                <article class="card secondary-chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <span class="chart-title">표준화 포지션</span>
+                            <span class="chart-subtitle">Net/OI의 52주 Robust Z-Score · ±2선은 상대적 극단 구간</span>
+                        </div>
+                    </div>
+                    <div id="zscore-chart"></div>
+                    <div class="chart-insight" id="zscore-insight">
+                        <span class="insight-label">현재 값 해석</span>
+                        <p id="zscore-summary">데이터를 불러오는 중입니다.</p>
+                        <small>
+                            계산: (현재 Net/OI − 최근 52주 중앙값) ÷ (1.4826 × MAD).
+                            Net/OI 부호는 절대 순롱·순숏, Z 부호는 자기 과거 대비 상대 위치입니다. Z는 매수·매도 신호 그 자체가 아닙니다.
+                        </small>
+                    </div>
+                </article>
+
+                <article class="card secondary-chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <span class="chart-title">Long / Short 구성</span>
+                            <span class="chart-subtitle">Short는 비교를 위해 음수로 표시</span>
+                        </div>
+                    </div>
+                    <div id="composition-chart"></div>
+                    <div class="chart-insight" id="composition-insight">
+                        <span class="insight-label">현재 구성 해석</span>
+                        <p id="composition-summary">데이터를 불러오는 중입니다.</p>
+                        <small>
+                            원자료의 Long과 Short 계약 수를 표시하며, Short는 비교가 쉽도록 화면에서만 음수로 뒤집습니다.
+                            Net = Long − Short이고 Spreading 포지션은 이 차트에서 제외됩니다.
+                        </small>
+                    </div>
+                </article>
+
+                <article class="card wide-chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <span class="chart-title">주간 포지션 흐름</span>
+                            <span class="chart-subtitle">1주 순포지션 변화</span>
+                        </div>
+                    </div>
+                    <div id="flow-chart"></div>
+                </article>
+
+                <article class="card wide-chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <span class="chart-title">가격 데이터 독립 검증</span>
+                            <span class="chart-subtitle">연속선물 가격과 미 재무부 공식 기준금리 · 방향은 통상 반대</span>
+                        </div>
+                    </div>
+                    <div id="price-yield-chart"></div>
+                </article>
+            </section>
+        </section>
+
+        <section class="interpretation-section">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">HOW U.S. RATES DESKS READ COT</div>
+                    <h2>미국 시장의 주체별 해석 가이드</h2>
+                    <p class="section-description">
+                        COT는 누가 시장을 맞히는지를 보여주는 표가 아니라, 각 주체가 어떤 목적으로 위험을 보유하고 있는지를 보여주는 포지션 지도에 가깝습니다.
+                    </p>
+                </div>
+            </div>
+
+            <div class="participant-guide-grid">
+                <article class="card participant-guide-card">
+                    <span class="guide-role sell-side">SELL SIDE</span>
+                    <h3>Dealer / Intermediary</h3>
+                    <p>
+                        대형 은행·증권사·스왑딜러 등 고객 거래를 받아주는 중개자입니다. 다른 시장과 고객 사이에서 위험을 상쇄하므로,
+                        포지션은 자체 금리 전망보다 고객 흐름의 반대편인 경우가 많습니다.
+                    </p>
+                    <strong>읽는 법</strong>
+                    <p>‘딜러 순숏 = 금리 상승 전망’이 아니라 딜러의 재고·중개 부담과 고객 수요가 어느 방향으로 몰렸는지를 봅니다.</p>
+                </article>
+
+                <article class="card participant-guide-card">
+                    <span class="guide-role buy-side">BUY SIDE · INSTITUTIONAL</span>
+                    <h3>Asset Manager / Institutional</h3>
+                    <p>
+                        뮤추얼펀드, 연기금, 보험사, 국부펀드 등 장기 기관입니다. 국채선물에서는 대체로 순롱 성향이지만,
+                        반드시 채권가격 상승 전망 때문만은 아닙니다.
+                    </p>
+                    <strong>읽는 법</strong>
+                    <p>현금채권 대신 유동성이 좋은 선물로 듀레이션을 확보하거나 벤치마크를 맞추는 구조적 수요인지 함께 봅니다.</p>
+                </article>
+
+                <article class="card participant-guide-card">
+                    <span class="guide-role leveraged">BUY SIDE · LEVERAGED</span>
+                    <h3>Leveraged Funds</h3>
+                    <p>
+                        헤지펀드, CTA, CPO 등입니다. 방향성 매매뿐 아니라 캐시–선물 베이시스, 커브, 상대가치 차익거래가 섞여 있습니다.
+                    </p>
+                    <strong>읽는 법</strong>
+                    <p>대규모 선물 숏은 현물 국채 매수와 짝을 이룬 베이시스 거래일 수 있으므로, ‘순숏 = 채권 약세 전망’으로 단정하지 않습니다.</p>
+                </article>
+
+                <article class="card participant-guide-card">
+                    <span class="guide-role other">BUY SIDE · MIXED</span>
+                    <h3>Other Reportables</h3>
+                    <p>
+                        기업 재무부서, 중앙은행, 소형 은행, 모기지 취급기관, 신용조합 등 나머지 대형 보고자를 묶은 혼합 집단입니다.
+                    </p>
+                    <strong>읽는 법</strong>
+                    <p>사업상 금리위험 헤지가 섞여 방향성이 가장 불균질합니다. 단독 신호보다 급격한 변화와 다른 주체와의 동행 여부를 봅니다.</p>
+                </article>
+            </div>
+
+            <article class="card market-structure-guide">
+                <div>
+                    <span class="chart-title">미국 금리시장의 전형적인 구조</span>
+                    <p class="structure-summary">
+                        Asset Manager의 구조적 선물 롱을 Leveraged Funds가 베이시스 거래용 숏으로 받아주고,
+                        Dealer가 중간에서 잔여 위험을 조정하는 형태가 자주 나타납니다.
+                    </p>
+                </div>
+                <ol class="interpretation-checklist">
+                    <li>각 주체가 자기 과거 대비 얼마나 극단적인가</li>
+                    <li>최근 1~4주 포지션이 어느 방향으로 변하는가</li>
+                    <li>Asset Manager 롱과 Leveraged Funds 숏이 함께 증가하는가</li>
+                    <li>가격·금리 움직임이 포지션 변화를 확인해 주는가</li>
+                    <li>극단적 포지션 청산이 시장 충격으로 이어질 가능성이 있는가</li>
+                </ol>
+                <p class="guide-conclusion">
+                    결론적으로 COT는 단독 방향 예측기보다 <strong>포지션 구조·혼잡도·청산 위험 지도</strong>로 해석하는 것이 적절합니다.
+                </p>
+            </article>
+
+            <article class="card price-data-guide">
+                <div class="price-data-heading">
+                    <span class="guide-role price-source">PRICE DATA NOTE</span>
+                    <h3>‘연구용 연속선물 가격’이란?</h3>
+                </div>
+                <p>
+                    현재 가격은 Yahoo Finance의 <strong>연속선물 심볼</strong>(예: 10년물 <code>ZN=F</code>)입니다.
+                    국채선물은 만기가 있으므로 실제 시장에서는 12월물처럼 특정 월물을 거래하지만, 연속선물은 대표 월물이 바뀔 때 여러 만기의 가격을 이어서 하나의 긴 차트로 보여줍니다.
+                </p>
+                <div class="price-usage-grid">
+                    <div>
+                        <strong>적합한 용도</strong>
+                        <span>장기 방향, 포지션과 가격의 관계, 연구 아이디어의 1차 검증</span>
+                    </div>
+                    <div>
+                        <strong>부적합한 용도</strong>
+                        <span>실제 체결가·정확한 손익, 롤 비용, CME 공식 정산가가 필요한 운용 검증</span>
+                    </div>
+                </div>
+                <p class="price-data-warning">
+                    월물이 교체되는 시점에는 두 계약의 가격 차이가 시계열에 섞일 수 있습니다. 실제 매매 전략 검증 단계에서는 CME 계약월별 공식 정산가와 명시적인 롤 규칙으로 교체해야 합니다.
+                </p>
+            </article>
+        </section>
+
+        <section class="research-section">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">POINT-IN-TIME VALIDATION</div>
+                    <h2>실데이터 신호 검증</h2>
+                </div>
+                <span class="quality-badge" id="quality-badge">검증 대기</span>
+            </div>
+
+            <div class="signal-grid">
+                <article class="signal-panel">
+                    <span class="stat-label">현재 Composite 상태</span>
+                    <strong id="current-signal">--</strong>
+                    <small id="entry-status">--</small>
+                </article>
+                <article class="signal-panel">
+                    <span class="stat-label">가격–금리 60일 상관</span>
+                    <strong id="price-yield-correlation">--</strong>
+                    <small>음수이면 방향 검증 통과</small>
+                </article>
+                <article class="signal-panel">
+                    <span class="stat-label">검증 COT 표본</span>
+                    <strong id="quality-cot-rows">--</strong>
+                    <small>전체 주간 관측치</small>
+                </article>
+                <article class="signal-panel">
+                    <span class="stat-label">검증 가격 표본</span>
+                    <strong id="quality-price-rows">--</strong>
+                    <small>전체 일별 관측치</small>
+                </article>
+            </div>
+
+            <div class="research-grid">
+                <article class="card backtest-table-card">
+                    <div class="chart-header">
+                        <div>
+                            <span class="chart-title">고정 규칙 백테스트</span>
+                            <span class="chart-subtitle">다음 화요일 종가 진입 · 포지션 변경 1bp 비용 · 파라미터 최적화 없음</span>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="metrics-table">
+                            <thead>
+                                <tr>
+                                    <th>전략</th>
+                                    <th>활성 주</th>
+                                    <th>승률</th>
+                                    <th>연환산 수익</th>
+                                    <th>Sharpe</th>
+                                    <th>최대 낙폭</th>
+                                </tr>
+                            </thead>
+                            <tbody id="backtest-table-body"></tbody>
+                        </table>
+                    </div>
+                </article>
+
+                <article class="card equity-card">
+                    <div class="chart-header">
+                        <div>
+                            <span class="chart-title">누적 검증 성과</span>
+                            <span class="chart-subtitle">비중 1/-1/0의 주간 전략 지수 · 초기값 1.0</span>
+                        </div>
+                    </div>
+                    <div id="equity-chart"></div>
+                </article>
+            </div>
+
+            <article class="card factor-card">
+                <div class="chart-header">
+                    <div>
+                        <span class="chart-title">요인 예측력</span>
+                        <span class="chart-subtitle">전체 실표본 Spearman Rank IC · 인과관계나 미래 수익 보장 아님</span>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>요인</th>
+                                <th>1주 IC</th>
+                                <th>4주 IC</th>
+                                <th>13주 IC</th>
+                                <th>표본</th>
+                            </tr>
+                        </thead>
+                        <tbody id="factor-table-body"></tbody>
+                    </table>
+                </div>
+            </article>
+        </section>
+
+        <section class="method-note">
+            <strong>정보시점 주의</strong>
+            COT는 화요일 포지션이며 통상 금요일에 공개됩니다. 화면의 발표 가능일은 화요일+3일 추정치이고,
+            휴일 주간에는 실제 발표일이 다를 수 있습니다. 가격은 Yahoo의 연속선물로 방향 확인과 연구에 사용하며,
+            실제 매매 가능한 특정 월물이나 CME 공식 정산가는 아닙니다.
+        </section>
+
+        <section class="error-panel" id="error-panel" hidden></section>
+    </main>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

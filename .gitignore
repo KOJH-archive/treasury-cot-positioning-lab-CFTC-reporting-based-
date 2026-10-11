@@ -1,0 +1,39 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local secrets and machine-specific settings
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+
+# Generated market-data caches and validation output
+data/*
+!data/.gitkeep
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Internal specifications, tests, and validation files
+GITHUB.md
+개발명세서.md
+validate_real_data.py
+실제데이터검증.bat
+tests/
